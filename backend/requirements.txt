@@ -1,0 +1,24 @@
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.9.2
+
+langchain==0.3.0
+langchain-community==0.3.0
+langchain-core==0.3.0
+langchain-google-genai==2.0.1
+langchain-chroma==0.1.4
+
+pypdf==4.2.0
+PyMuPDF==1.24.5
+Pillow==10.4.0
+pytesseract==0.3.13
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+transformers==4.41.2
+tokenizers>=0.13.2,<=0.20.3
+huggingface-hub<1.0
+sentence-transformers==2.7.0
+langchain-huggingface
+langchain-chroma
+chromadb==0.5.23
