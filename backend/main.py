@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from langchain_openai import ChatOpenAI,OpenAIEmbeddings
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -195,8 +196,27 @@ async def ask_question(request: QuestionRequest):
         return {"answer": answer, "source": doc_name, "pages": page_nos, "session_id": session_id}
     
     except Exception as e:
+        error_str = str(e)
+        error_msg_lower = error_str.lower()
+
+        if (
+            "429" in error_str or 
+            "rate_limit" in error_msg_lower or 
+            "rate limit" in error_msg_lower or 
+            "quota" in error_msg_lower
+        ):
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "answer": "Request limit exceeded. Our AI tutor is a bit busy right now. Please wait a minute and try again!",
+                    "source": "error",
+                    "pages": [],
+                    "session_id": session_id
+                }
+            )
         raise HTTPException(status_code=500, detail=str(e))
     
+#this route is not used 
 @app.post("/api/chat/reset")
 async def reset_history(session_id: Optional[str] = None):
     if session_id and session_id in session_db:
