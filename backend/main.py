@@ -3,14 +3,16 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import HumanMessage, AIMessage
 import re
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-
-
+from pinecone import Pinecone
+from langchain_pinecone import PineconeVectorStore
+from typing import Optional
+import uuid
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -45,21 +47,27 @@ def parse_query_filters(question: str):
     page_match = re.search(r'\b(?:page|pg|p\.?)\s*(\d+)\b', question_lower)
     matched_page = int(page_match.group(1)) - 1 if page_match else None
 
-    # FAISS uses a plain exact-match dict, not Chroma's $and/$eq operators
-    faiss_filter = {}
+    conditions = []
     if matched_file:
-        faiss_filter["file_name"] = matched_file
+        conditions.append({"file_name": {"$eq": matched_file}})
     if matched_page is not None:
-        faiss_filter["page"] = matched_page
+        conditions.append({"page": {"$eq": matched_page}})
 
-    return (faiss_filter or None), matched_file, matched_page
+    if not conditions:
+        pinecone_filter = None
+    elif len(conditions) == 1:
+        pinecone_filter = conditions[0]
+    else:
+        pinecone_filter = {"$and": conditions}
+
+    return (pinecone_filter or None), matched_file, matched_page
 
 app =FastAPI()
 
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for simplicity
+    allow_origins=[os.environ.get("FRONTEND_URL")],  # Allow all origins for simplicity
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,16 +77,30 @@ class ResponseModel(BaseModel):
     answer: str
     has_source: bool = False
 
-base_llm=ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
-llm_json=ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0).with_structured_output(ResponseModel)
+# llm_json=ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0).with_structured_output(ResponseModel)
+llm_json = ChatOpenAI(
+    base_url="https://models.inference.ai.azure.com",
+    api_key=os.environ.get("ACCESS_TOKEN"),
+    model="gpt-4o-mini"
+).with_structured_output(ResponseModel, method="function_calling")
 embedding_model=HuggingFaceEmbeddings( model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-FAISS_DB_DIR = "./faiss_db"
-if not os.path.exists(FAISS_DB_DIR):
-    raise FileNotFoundError(f"FAISS DB directory '{FAISS_DB_DIR}' not found. Please run the ingest script first.")
+# replace with
+pine_cone = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
+index_name = os.environ.get("INDEX_NAME")
+if not index_name:
+    raise ValueError("INDEX_NAME environment variable is not set. Check your .env file.")
 
-vectorstore = FAISS.load_local(FAISS_DB_DIR, embedding_model, allow_dangerous_deserialization=True)
-retriever=vectorstore.as_retriever(search_kwargs={"k": 3})
+if index_name not in [idx.name for idx in pine_cone.list_indexes()]:
+    raise ValueError(f"Pinecone index '{index_name}' does not exist. Please run ingest.py first.")
+
+vectorstore = PineconeVectorStore(
+    index_name=index_name,
+    embedding=embedding_model,
+    pinecone_api_key=os.environ["PINECONE_API_KEY"],
+)
+
+retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
@@ -91,7 +113,7 @@ Follow these strict guidelines:
 1. GREETINGS: If the user greets you, respond warmly. Set `has_source` to false.
 2. ANSWERING: Only answer biology questions using the provided context. Do not use outside knowledge. If the exact answer is in the context, set `has_source` to true.
 3. OUT OF CONTEXT / MISSING: If the answer is NOT explicitly in the context, gently explain that your learning materials do not contain this information yet. Set `has_source` to false.
-
+4. FOLLOW-UP ENGAGEMENT: After a valid biology answer, ALWAYS end with an encouraging follow-up question.
 Context:
 {context}"""),
     MessagesPlaceholder(variable_name="chat_history"),
@@ -99,23 +121,11 @@ Context:
 ])
 
 
-# clarification question prompt
-clarification_prompt = ChatPromptTemplate.from_messages([
-    ("system", """You are a question clarifier. Given a user's question, rewrite it to be:
-- Clear and specific
-- Free of ambiguity  
-- Optimized for searching a document
 
-Return ONLY the rewritten question. No explanation, no preamble."""),
-    ("human", "{raw_question}")
-])
-
-clarification_chain = clarification_prompt | base_llm | StrOutputParser()
-# -----------
-
-chat_history = []
+session_db = {}
 
 class QuestionRequest(BaseModel):
+    session_id: Optional[str] = None
     question: str
 
 
@@ -123,20 +133,26 @@ class QuestionRequest(BaseModel):
 async def ask_question(request: QuestionRequest):
     try:
         raw_question = request.question
-        # Clarify the question
-        question = clarification_chain.invoke({"raw_question": raw_question})
-        print(f"Clarified question: {question}")
-        # context_docs = retriever.invoke(question)
-        # newly added--------
-        faiss_filter, matched_file, matched_page = parse_query_filters(raw_question)  # use raw_question, not clarified
+        session_id = request.session_id
 
-        if faiss_filter:
+        if not session_id:
+            session_id = str(uuid.uuid4())
+        
+        if session_id not in session_db:
+            session_db[session_id] =  []
+        
+        current_history=session_db[session_id]
+        # Clarify the question
+        print(f"question: {raw_question}")
+        pinecone_filter, matched_file, matched_page = parse_query_filters(raw_question)  # use raw_question, not clarified
+
+        if pinecone_filter:
             filtered_retriever = vectorstore.as_retriever(
-                search_kwargs={"k": 5, "filter": faiss_filter,"fetch_k": 50}
+                search_kwargs={"k": 5, "filter": pinecone_filter}
             )
-            context_docs = filtered_retriever.invoke(question)
+            context_docs = filtered_retriever.invoke(raw_question)
         else:
-            context_docs = retriever.invoke(question)
+            context_docs = retriever.invoke(raw_question)
         # -------------------
         context = format_docs(context_docs)
 
@@ -145,16 +161,18 @@ async def ask_question(request: QuestionRequest):
             | llm_json
         ).invoke({
             "context": context,
-            "chat_history": chat_history,
-            "question": question
+            "chat_history": current_history,
+            "question": raw_question
         })
 
         answer = response.answer
         is_source_available = response.has_source
 
         # Update history
-        chat_history.append(HumanMessage(content=question))
-        chat_history.append(AIMessage(content=answer))
+        current_history.append(HumanMessage(content=raw_question))
+        current_history.append(AIMessage(content=answer))
+        if len(current_history) > 10:
+            current_history[:] = current_history[-10:]
 
         page_nos=[]
         doc_name=None
@@ -172,12 +190,15 @@ async def ask_question(request: QuestionRequest):
         else:
             doc_name="unknown"
             page_nos=[]
-        return {"answer": answer, "source": doc_name, "pages": page_nos}
+        return {"answer": answer, "source": doc_name, "pages": page_nos, "session_id": session_id}
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.post("/api/chat/reset")
-async def reset_history():
-    chat_history.clear()
+async def reset_history(session_id: Optional[str] = None):
+    if session_id and session_id in session_db:
+        del session_db[session_id]
+    else:
+        session_db.clear()
     return {"message": "Chat history reset."}
