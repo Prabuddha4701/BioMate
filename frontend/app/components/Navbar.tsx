@@ -24,7 +24,9 @@ function Navbar() {
         <div className="flex flex-row  gap-3">
           <div>
             <div className={logoTitle(dark)}>BioMate</div>
-            <div className={logoSub(dark)}>Your AI reading companion</div>
+            <div className={logoSub(dark)}>
+              Chat with A/L Biology Resource books
+            </div>
           </div>
           <div>
             <button

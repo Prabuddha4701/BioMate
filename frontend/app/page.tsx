@@ -31,12 +31,10 @@ interface Chat {
 
 export default function Home() {
   const { dark, setDark } = useTheme();
+  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+  const MAX_RENDERED_MESSAGES = 50;
   const [IsThinking, setIsThinking] = useState(false);
-  const [chats, setChats] = useState<Chat[]>([
-    { id: 1, name: "Introduction to ML" },
-    { id: 2, name: "Chapter 3 Notes" },
-    { id: 3, name: "Exam Prep" },
-  ]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const initialMessage = `# Hey, I'm BioMate
 
@@ -59,15 +57,7 @@ Your AI study buddy for the A/L Biology syllabus. Ask me anything and I'll pull 
       text: initialMessage,
     },
   ]);
-  const chatListEndRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    chatListEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-    });
-  }, [chats.length]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({
@@ -88,14 +78,18 @@ Your AI study buddy for the A/L Biology syllabus. Ask me anything and I'll pull 
     console.log("Sending message:", currentMessage);
 
     try {
-      const response = await fetch("http://localhost:8000/api/ask", {
+      const response = await fetch(`${BACKEND_URL}/api/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: currentMessage,
+          session_id: sessionId,
         }),
       });
       const data = await response.json();
+      if (!sessionId && data.session_id) {
+        setSessionId(data.session_id);
+      }
 
       setMessages((p) => [
         ...p,
@@ -114,7 +108,7 @@ Your AI study buddy for the A/L Biology syllabus. Ask me anything and I'll pull 
         {
           id: Date.now(),
           role: "bot",
-          text: "Sorry, something went wrong. Please try again.",
+          text: "Sorry, something went wrong. Please try again Later.",
         },
       ]);
     } finally {
@@ -138,11 +132,12 @@ Your AI study buddy for the A/L Biology syllabus. Ask me anything and I'll pull 
                   Start a conversation!
                 </p>
                 <p className={`text-sm ${emptySubText}`}>
-                  Ask anything about your PDF
+                  Ask anything from the A/L Biology syllabus and get answers
+                  straight from your study material.
                 </p>
               </div>
             ) : (
-              messages.map((msg) => (
+              messages.slice(-MAX_RENDERED_MESSAGES).map((msg) => (
                 <div
                   key={msg.id}
                   className={`flex items-end gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
@@ -164,8 +159,11 @@ Your AI study buddy for the A/L Biology syllabus. Ask me anything and I'll pull 
                     {msg.source != "unknown" && msg.page_nos && (
                       <div className="text-xs text-gray-500 mt-1">
                         <br />
-                        Source : {msg.source} , Pages :{" "}
-                        {msg.page_nos.join(", ")}
+                        Unit :{" "}
+                        {msg.source
+                          ? msg.source.replace(".pdf", "")
+                          : "Unknown"}{" "}
+                        , Unit Pages : {msg.page_nos.join(", ")}
                       </div>
                     )}
                   </div>
@@ -189,7 +187,7 @@ Your AI study buddy for the A/L Biology syllabus. Ask me anything and I'll pull 
             <div className="flex gap-2 sm:gap-3 items-center max-w-3xl mx-auto">
               <input
                 className={inputEl(dark)}
-                placeholder="Ask something about your PDF..."
+                placeholder="Ask anything from the Resource books..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
