@@ -20,7 +20,7 @@ An intelligent full-stack RAG (Retrieval-Augmented Generation) application built
 - **Vector Database:** Pinecone
 - **LLM:** GitHub Models (gpt-4o-mini) / Google Gemini
 
----
+## This is created for deployment.
 
 ## 🚀 Getting Started
 
