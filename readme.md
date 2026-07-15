@@ -72,8 +72,13 @@ Start the FastAPI development server:
 Bash
 uvicorn main:app --reload
 The backend will be running at http://127.0.0.1:8000.
+```
 
-3. Frontend Setup
+---
+
+### 2. Frontend Setup
+
+```bash
 Navigate into the frontend project directory:
 
 Bash

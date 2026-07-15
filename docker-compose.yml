@@ -23,13 +23,13 @@ services:
     networks:
       - app-network
 
-  # ── Vite + React Frontend ────────────────────────────────────────────
+  # ── Next.js Frontend ────────────────────────────────────────────
   frontend:
-    build: ./frontend_new
+    build: ./frontend
     ports:
       - "3000:3000"
     volumes:
-      - ./frontend_new:/app
+      - ./frontend:/app
       - /app/node_modules
       - /app/.next
     environment:
@@ -42,5 +42,3 @@ services:
 networks:
   app-network:
     driver: bridge
-    # All services on this network can reach each other by service name
-    # e.g. backend can connect to "db:5432", frontend nginx proxies to "backend:8000"
