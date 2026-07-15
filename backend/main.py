@@ -2,13 +2,11 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI,OpenAIEmbeddings
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import HumanMessage, AIMessage
 import re
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from pinecone import Pinecone
 from langchain_pinecone import PineconeVectorStore
 from typing import Optional
@@ -83,8 +81,12 @@ llm_json = ChatOpenAI(
     api_key=os.environ.get("ACCESS_TOKEN"),
     model="gpt-4o-mini"
 ).with_structured_output(ResponseModel, method="function_calling")
-embedding_model=HuggingFaceEmbeddings( model_name="sentence-transformers/all-MiniLM-L6-v2")
 
+embedding_model = OpenAIEmbeddings(
+    model="text-embedding-3-small",
+    openai_api_key=os.environ.get("ACCESS_TOKEN"),
+    base_url="https://models.inference.ai.azure.com"
+)
 # replace with
 pine_cone = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
 index_name = os.environ.get("INDEX_NAME")

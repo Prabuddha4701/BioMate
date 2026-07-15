@@ -57,7 +57,6 @@ Your AI study buddy for the A/L Biology syllabus. Ask me anything and I'll pull 
       text: initialMessage,
     },
   ]);
-  const chatListEndRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -109,7 +108,7 @@ Your AI study buddy for the A/L Biology syllabus. Ask me anything and I'll pull 
         {
           id: Date.now(),
           role: "bot",
-          text: "Sorry, something went wrong. Please try again.",
+          text: "Sorry, something went wrong. Please try again Later.",
         },
       ]);
     } finally {
@@ -133,7 +132,8 @@ Your AI study buddy for the A/L Biology syllabus. Ask me anything and I'll pull 
                   Start a conversation!
                 </p>
                 <p className={`text-sm ${emptySubText}`}>
-                  Ask anything about your PDF
+                  Ask anything from the A/L Biology syllabus and get answers
+                  straight from your study material.
                 </p>
               </div>
             ) : (
@@ -187,7 +187,7 @@ Your AI study buddy for the A/L Biology syllabus. Ask me anything and I'll pull 
             <div className="flex gap-2 sm:gap-3 items-center max-w-3xl mx-auto">
               <input
                 className={inputEl(dark)}
-                placeholder="Ask something from Resource book..."
+                placeholder="Ask anything from the Resource books..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
