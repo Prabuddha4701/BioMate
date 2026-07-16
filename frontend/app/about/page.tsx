@@ -63,9 +63,9 @@ function About() {
             <p
               className={`text-sm leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}
             >
-              BioMate was created by <strong>Prabuddha Paranavithana</strong>{" "}
-              purely for learning purposes and for fun. Built as a hands-on
-              architectural study, this environment explores modern
+              Hi, I am <strong>Prabuddha Paranavithana</strong>. I created
+              BioMate purely for learning purposes and for fun. Built as a
+              hands-on architectural study, this project explores modern
               Retrieval-Augmented Generation (RAG) capabilities to provide
               accurate context extraction directly from formal educational
               resources.
@@ -106,7 +106,7 @@ function About() {
                     className={`text-xs mt-1 leading-relaxed ${dark ? "text-gray-400" : "text-gray-500"}`}
                   >
                     Operating as a dedicated RAG system loaded exclusively with
-                    the official **Advanced Level (A/L) Biology syllabus**,
+                    the official <b>Advanced Level (A/L) Biology syllabus</b>,
                     ensuring domain-specific containment and zero reliance on
                     arbitrary general knowledge lookups.
                   </p>
@@ -130,19 +130,19 @@ function About() {
                   <h4
                     className={`text-sm font-bold ${dark ? "text-gray-200" : "text-gray-800"}`}
                   >
-                    Embedding Tokenization
+                    Semantic Embedding
                   </h4>
                   <p
                     className={`text-xs mt-1 leading-relaxed ${dark ? "text-gray-400" : "text-gray-500"}`}
                   >
-                    Syllabus document nodes are embedded using the{" "}
+                    Syllabus document nodes are vectorized using the{" "}
                     <code
                       className={`px-1.5 py-0.5 rounded font-mono text-[11px] ${dark ? "bg-gray-800 text-emerald-400" : "bg-emerald-50 text-emerald-700"}`}
                     >
-                      all-MiniLM-L6-v2
+                      text-embedding-3-small
                     </code>{" "}
-                    semantic mapping model, allowing fast structural similarity
-                    indexing inside the local vector database.
+                    model, enabling fast and precise semantic similarity search
+                    across course materials.
                   </p>
                 </div>
               </div>
@@ -173,7 +173,7 @@ function About() {
                     conversational, syllabus-accurate answers utilizing the
                     high-efficiency{" "}
                     <strong className={dark ? "text-white" : "text-slate-900"}>
-                      Gemini 2.0 Flash
+                      gpt-4o-mini
                     </strong>{" "}
                     model.
                   </p>
